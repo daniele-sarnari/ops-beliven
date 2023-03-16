@@ -4,7 +4,7 @@
 
 1. Run `cd terraform`
 2. Run `cp terraform.tfvars.example.json terraform.tfvars.json`
-3. Add hcloud_token to `terraform.tfvars.json`
+3. Add the missing values to `terraform.tfvars.json`
 4. Run `terraform init`
 5. Run `terraform apply`
 6. Copy the VM IP to clipboard
