@@ -1,37 +1,154 @@
 ---
-- hosts: all
-  roles:
-    - ufw
-  vars:
-    ufw_rules:
-      - rule: allow
-        to_port: 22
-        protocol: tcp
-        comment: "allow incoming connection on standard ssh port"
-      - rule: allow
-        to_port: 80
-        protocol: tcp
-        comment: "allow incoming connection on standard http port"
-      - rule: allow
-        to_port: 443
-        protocol: tcp
-        comment: "allow incoming connection on standard https port"
+# - name: UFW Setup
+#   hosts: all
+#   roles:
+#     - ufw
+#   vars:
+#     ufw_rules:
+#       - rule: allow
+#         to_port: 22
+#         protocol: tcp
+#         comment: "allow incoming connection on standard ssh port"
+#       - rule: allow
+#         to_port: 80
+#         protocol: tcp
+#         comment: "allow incoming connection on standard http port"
+#       - rule: allow
+#         to_port: 443
+#         protocol: tcp
+#         comment: "allow incoming connection on standard https port"
 
-- hosts: all
-  roles:
-    - fail2ban
-  vars:
-    fail2ban_services:
-      # In older versions of Fail2Ban this is called ssh
-      - name: sshd
-        port: 22
-        maxretry: 5
-        bantime: -1
+# - name: Fail2Ban Setup
+#   hosts: all
+#   roles:
+#     - fail2ban
+#   vars:
+#     fail2ban_services:
+#       # In older versions of Fail2Ban this is called ssh
+#       - name: sshd
+#         port: 22
+#         maxretry: 5
+#         bantime: -1
 
-- hosts: all
+# - name: Unattended Upgrades Setup
+#   hosts: all
+#   roles:
+#     - role: unattended-upgrades
+#       unattended_origins_patterns:
+#         - "origin=Ubuntu,archive=${distro_codename}-security"
+#         - "o=Ubuntu,a=${distro_codename}-updates"
+#       unattended_package_blacklist: [cowsay, vim]
+
+# - name: SFTP setup
+#   hosts: all
+#   become: yes
+#   become_user: root
+#   roles:
+#     - sftp
+#   vars:
+#     - sftp_users:
+#         - name: laravel
+#           group: "www-data"
+#           password: "$1$salty$2xanw0mcB1TeQ6veLRreq0"
+#           shell: False
+#           sftp_directories:
+#             - { name: project, mode: 775 }
+
+# - hosts: all
+#   name: Uninstall apache2
+#   tasks:
+#     - name: Uninstall apache2
+#       ansible.builtin.apt:
+#         name:
+#           - apache2
+#           - apache2-utils
+#         state: absent
+#         purge: true
+
+- name: Nginx setup
+  hosts: all
   roles:
-    - role: unattended-upgrades
-      unattended_origins_patterns:
-        - "origin=Ubuntu,archive=${distro_codename}-security"
-        - "o=Ubuntu,a=${distro_codename}-updates"
-      unattended_package_blacklist: [cowsay, vim]
+    - nginx
+  vars:
+    - nginx_user: "www-data"
+    - nginx_remove_default_vhost: true
+    - nginx_vhosts:
+        - listen: "80 default_server"
+          server_name: "laravel.beliven.com"
+          root: "/home/laravel/project"
+          index: "index index.php index.html index.htm"
+          extra_parameters: |
+            add_header X-Frame-Options "SAMEORIGIN";
+            add_header X-XSS-Protection "1; mode=block";
+            add_header X-Content-Type-Options "nosniff";
+
+            charset utf-8;
+
+            location / {
+                try_files $uri $uri/ /index.php?$query_string;
+            }
+
+            location = /favicon.ico { access_log off; log_not_found off; }
+            location = /robots.txt  { access_log off; log_not_found off; }
+
+            error_page 404 /index.php;
+
+            location ~ \.php$ {
+                fastcgi_pass 127.0.0.1:9000;
+                fastcgi_index index.php;
+                fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+                include fastcgi_params;
+            }
+
+            location ~ /\.(?!well-known).* {
+                deny all;
+            }
+
+# - hosts: all
+#   name: Install packages
+#   become: yes
+#   tasks:
+#     - ansible.builtin.apt:
+#         name:
+#           - software-properties-common
+#         state: latest
+#     - ansible.builtin.apt_repository:
+#         repo: ppa:ondrej/php
+#         state: present
+#     - ansible.builtin.apt:
+#         name:
+#           - php8.1
+#         state: latest
+
+- name: PHP-FPM setup
+  hosts: all
+  roles:
+    - role: php
+  vars:
+    - php_packages:
+        - php8.1-bcmath
+        - php8.1-ctype
+        - php8.1-fileinfo
+        - php8.1-mbstring
+        - php8.1-pdo
+        - php8.1-tokenizer
+        - php8.1-xml
+        - php8.1-fpm
+        - php8.1-apcu
+    - php_enable_webserver: true
+    - php_webserver_daemon: "nginx"
+    - php_default_version_debian: "8.1"
+    - php_install_recommends: true
+    - php_enable_php_fpm: true
+    - php_fpm_state: started
+    - php_fpm_enabled_on_boot: true
+    - php_fpm_pool_user: "laravel"
+    - php_fpm_pool_group: "www-data"
+# - name: Laravel cron
+#   hosts: all
+#   tasks:
+#     - ansible.builtin.cron:
+#         name: "laravel cron"
+#         user: laravel
+#         minute: "*"
+#         job: "cd /home/laravel/project && php artisan schedule:run >> /dev/null 2>&1"

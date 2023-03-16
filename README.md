@@ -18,6 +18,8 @@
 
 ### `ansible all -a "/bin/echo hello"`
 
-### `ansible-galaxy install --roles-path . git+https://github.com/jnv/ansible-role-unattended-upgrades.git`
+### `ansible-galaxy install -r requirements.yml --roles-path .`
 
 ### `ansible-playbook playbook.yml`
+
+### `openssl passwd -1 -salt passpass`

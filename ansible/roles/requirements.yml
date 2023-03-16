@@ -1,0 +1,18 @@
+---
+- src: git+https://github.com/jnv/ansible-role-unattended-upgrades.git
+  name: unattended-upgrades
+
+- src: git+https://github.com/Oefenweb/ansible-ufw.git
+  name: ufw
+
+- src: git+https://github.com/Oefenweb/ansible-fail2ban.git
+  name: fail2ban
+
+- src: git+https://github.com/johanmeiring/ansible-sftp.git
+  name: sftp
+
+- src: git+https://github.com/geerlingguy/ansible-role-nginx.git
+  name: nginx
+
+- src: git+https://github.com/geerlingguy/ansible-role-php.git
+  name: php
