@@ -1,0 +1,37 @@
+---
+- hosts: all
+  roles:
+    - ufw
+  vars:
+    ufw_rules:
+      - rule: allow
+        to_port: 22
+        protocol: tcp
+        comment: "allow incoming connection on standard ssh port"
+      - rule: allow
+        to_port: 80
+        protocol: tcp
+        comment: "allow incoming connection on standard http port"
+      - rule: allow
+        to_port: 443
+        protocol: tcp
+        comment: "allow incoming connection on standard https port"
+
+- hosts: all
+  roles:
+    - fail2ban
+  vars:
+    fail2ban_services:
+      # In older versions of Fail2Ban this is called ssh
+      - name: sshd
+        port: 22
+        maxretry: 5
+        bantime: -1
+
+- hosts: all
+  roles:
+    - role: unattended-upgrades
+      unattended_origins_patterns:
+        - "origin=Ubuntu,archive=${distro_codename}-security"
+        - "o=Ubuntu,a=${distro_codename}-updates"
+      unattended_package_blacklist: [cowsay, vim]
