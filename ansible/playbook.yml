@@ -1,81 +1,100 @@
 ---
-# - name: UFW Setup
-#   hosts: all
-#   roles:
-#     - ufw
-#   vars:
-#     ufw_rules:
-#       - rule: allow
-#         to_port: 22
-#         protocol: tcp
-#         comment: "allow incoming connection on standard ssh port"
-#       - rule: allow
-#         to_port: 80
-#         protocol: tcp
-#         comment: "allow incoming connection on standard http port"
-#       - rule: allow
-#         to_port: 443
-#         protocol: tcp
-#         comment: "allow incoming connection on standard https port"
-
-# - name: Fail2Ban Setup
-#   hosts: all
-#   roles:
-#     - fail2ban
-#   vars:
-#     fail2ban_services:
-#       # In older versions of Fail2Ban this is called ssh
-#       - name: sshd
-#         port: 22
-#         maxretry: 5
-#         bantime: -1
-
-# - name: Unattended Upgrades Setup
-#   hosts: all
-#   roles:
-#     - role: unattended-upgrades
-#       unattended_origins_patterns:
-#         - "origin=Ubuntu,archive=${distro_codename}-security"
-#         - "o=Ubuntu,a=${distro_codename}-updates"
-#       unattended_package_blacklist: [cowsay, vim]
-
-# - name: SFTP setup
-#   hosts: all
-#   become: yes
-#   become_user: root
-#   roles:
-#     - sftp
-#   vars:
-#     - sftp_users:
-#         - name: laravel
-#           group: "www-data"
-#           password: "$1$salty$2xanw0mcB1TeQ6veLRreq0"
-#           shell: False
-#           sftp_directories:
-#             - { name: project, mode: 775 }
-
-# - hosts: all
-#   name: Uninstall apache2
-#   tasks:
-#     - name: Uninstall apache2
-#       ansible.builtin.apt:
-#         name:
-#           - apache2
-#           - apache2-utils
-#         state: absent
-#         purge: true
-
-- name: Nginx setup
+- name: Setup VM
   hosts: all
+  vars_prompt:
+    - name: username
+      prompt: SFTP user name?
+      private: false
+
+    - name: password
+      prompt: SFTP user password?
+      private: true
+      encrypt: md5_crypt
+      confirm: true
+
+    - name: database_name
+      prompt: Database name?
+      private: false
+
+    - name: mysql_username
+      prompt: MySQL username?
+      private: false
+
+    - name: mysql_password
+      prompt: MySQL password?
+      private: true
+      confirm: true
+  pre_tasks:
+    - name: Uninstall apache2
+      ansible.builtin.apt:
+        name:
+          - apache2
+          - apache2-utils
+        state: absent
+        purge: true
+    - name: Software-properties-common
+      ansible.builtin.apt:
+        name:
+          - software-properties-common
+        state: present
+    - name: Apt repository ppa:ondrej/php
+      ansible.builtin.apt_repository:
+        repo: ppa:ondrej/php
+        state: present
+    - name: PHP 8.1
+      ansible.builtin.apt:
+        name:
+          - php8.1
+        state: present
+  post_tasks:
+    - name: "Laravel cron"
+      ansible.builtin.cron:
+        name: "laravel cron"
+        user: "{{ username }}"
+        minute: "*"
+        job: "cd /home/{{ username }}/project && php artisan schedule:run >> /dev/null 2>&1"
   roles:
-    - nginx
-  vars:
-    - nginx_user: "www-data"
-    - nginx_remove_default_vhost: true
-    - nginx_vhosts:
+    - role: ufw
+      ufw_rules:
+        - rule: allow
+          to_port: 22
+          protocol: tcp
+          comment: "allow incoming connection on standard ssh port"
+        - rule: allow
+          to_port: 80
+          protocol: tcp
+          comment: "allow incoming connection on standard http port"
+        - rule: allow
+          to_port: 443
+          protocol: tcp
+          comment: "allow incoming connection on standard https port"
+    - role: fail2ban
+      fail2ban_services:
+        # In older versions of Fail2Ban this is called ssh
+        - name: sshd
+          port: 22
+          maxretry: 5
+          bantime: -1
+    - role: unattended-upgrades
+      unattended_origins_patterns:
+        - "origin=Ubuntu,archive=${distro_codename}-security"
+        - "o=Ubuntu,a=${distro_codename}-updates"
+      unattended_package_blacklist: [cowsay, vim]
+    - role: sftp
+      sftp_users:
+        - name: "{{ username }}"
+          group: "www-data"
+          password: "{{ password }}"
+          shell: false
+          sftp_directories:
+            - { name: project, mode: 775 }
+    - role: nginx
+      nginx_user: "www-data"
+      nginx_remove_default_vhost: true
+      nginx_vhosts:
         - listen: "80 default_server"
           server_name: "laravel.beliven.com"
-          root: "/home/laravel/project"
+          root: "/home/{{ username }}/project/public"
           index: "index index.php index.html index.htm"
           extra_parameters: |
             add_header X-Frame-Options "SAMEORIGIN";
@@ -103,29 +122,8 @@
             location ~ /\.(?!well-known).* {
                 deny all;
             }
-
-# - hosts: all
-#   name: Install packages
-#   become: yes
-#   tasks:
-#     - ansible.builtin.apt:
-#         name:
-#           - software-properties-common
-#         state: latest
-#     - ansible.builtin.apt_repository:
-#         repo: ppa:ondrej/php
-#         state: present
-#     - ansible.builtin.apt:
-#         name:
-#           - php8.1
-#         state: latest
-
-- name: PHP-FPM setup
-  hosts: all
-  roles:
     - role: php
-  vars:
-    - php_packages:
+      php_packages:
         - php8.1-bcmath
         - php8.1-ctype
         - php8.1-fileinfo
@@ -135,20 +133,25 @@
         - php8.1-xml
         - php8.1-fpm
         - php8.1-apcu
-    - php_enable_webserver: true
-    - php_webserver_daemon: "nginx"
-    - php_default_version_debian: "8.1"
-    - php_install_recommends: true
-    - php_enable_php_fpm: true
-    - php_fpm_state: started
-    - php_fpm_enabled_on_boot: true
-    - php_fpm_pool_user: "laravel"
-    - php_fpm_pool_group: "www-data"
-# - name: Laravel cron
-#   hosts: all
-#   tasks:
-#     - ansible.builtin.cron:
-#         name: "laravel cron"
-#         user: laravel
-#         minute: "*"
-#         job: "cd /home/laravel/project && php artisan schedule:run >> /dev/null 2>&1"
+      php_enable_webserver: true
+      php_webserver_daemon: "nginx"
+      php_default_version_debian: "8.1"
+      php_install_recommends: true
+      php_enable_php_fpm: true
+      php_fpm_state: started
+      php_fpm_enabled_on_boot: true
+      php_fpm_pool_user: "{{ username }}"
+      php_fpm_pool_group: "www-data"
+    - role: mysql
+      mysql_enabled_on_startup: true
+      mysql_databases:
+        - name: "{{ database_name }}"
+          encoding: "utf8"
+          collation: "utf8_general_ci"
+      mysql_users:
+        - name: "{{ mysql_username }}"
+          host: localhost
+          password: "{{ mysql_password }}"
+          encrypted: false
+      mysql_port: "3306"
+      mysql_bind_address: "0.0.0.0"

@@ -16,3 +16,6 @@
 
 - src: git+https://github.com/geerlingguy/ansible-role-php.git
   name: php
+
+- src: git+https://github.com/geerlingguy/ansible-role-mysql.git
+  name: mysql
