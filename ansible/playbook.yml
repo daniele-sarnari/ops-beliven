@@ -24,6 +24,9 @@
       prompt: MySQL password?
       private: true
       confirm: true
+
+    - name: vhost_server_name
+      prompt: Nginx server name? (something like laravel.beliven.com)
   pre_tasks:
     - name: Uninstall apache2
       ansible.builtin.apt:
@@ -93,7 +96,7 @@
       nginx_remove_default_vhost: true
       nginx_vhosts:
         - listen: "80 default_server"
-          server_name: "laravel.beliven.com"
+          server_name: "{{ vhost_server_name }}"
           root: "/home/{{ username }}/project/public"
           index: "index index.php index.html index.htm"
           extra_parameters: |
